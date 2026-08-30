@@ -27,7 +27,11 @@ RUN apk add --no-cache tzdata \
  libjpeg-turbo-dev \
  sqlite-dev
 
-RUN pecl install redis apcu mcrypt
+# phpredis is pinned to the last 5.x: snc/redis-bundle 3.6.0 (the newest release
+# compatible with Symfony 5.1) subclasses \Redis and overrides bitCount($key) with a
+# single parameter. phpredis 6.0 widened Redis::bitcount() to 4 parameters, which makes
+# that override an incompatible declaration and fatals the app. Unpinning this pulls 6.x.
+RUN pecl install redis-5.3.7 apcu mcrypt
 RUN docker-php-ext-enable redis apcu mcrypt
 
 # Install various PHP extensions
@@ -100,8 +104,7 @@ USER www-data
 RUN mkdir -p /srv/www/homebuh/{var/{log,cache},vendor}
 
 WORKDIR /srv/www/homebuh
-COPY --chown=www-data ./source/app/composer.json composer.json
-COPY --chown=www-data ./source/app/composer.lock composer.lock
-RUN composer install --prefer-dist --no-interaction --no-scripts -v \
-    && composer dump-autoload -o --apcu --no-interaction --no-scripts
-#COPY --chown=www-data ../../source/app ./
+
+# The app is bind-mounted over /srv/www/homebuh at runtime (see docker-compose.yml),
+# which shadows anything installed here at build time. Install dependencies into the
+# mounted host directory after the stack is up instead: `make up && make vendor`.

@@ -1,4 +1,3 @@
-version: '3.4'
 services:
   php-fpm:
     build:
@@ -11,6 +10,7 @@ services:
       - 9000
     depends_on:
       - "mysql"
+      - "redis"
     environment:
       - MYSQL_HOST=mysql
 
@@ -26,11 +26,17 @@ services:
       - 82:80
     depends_on:
       - "php-fpm"
+  redis:
+    container_name: homebuh_redis
+    image: redis:6-alpine
+    ports:
+      - 6379:6379
+
   mysql:
     container_name: homebuh_mysql
     image: percona/percona-server:5.7
     env_file: ./source/app/.env
-    command: "--default-authentication-plugin=mysql_native_password --disable-log-bin"
+    command: "--default-authentication-plugin=mysql_native_password --disable-log-bin --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
     volumes:
       - homebuh-mysql:/var/lib/mysql
     ports:
@@ -38,6 +44,16 @@ services:
     user: mysql
     environment:
       - MYSQL_ALLOW_EMPTY_PASSWORD=1
+      # Matches the database name in DATABASE_URL. Only takes effect when the
+      # homebuh-mysql volume is empty: the entrypoint skips all initialization on
+      # an already-populated data directory.
+      - MYSQL_DATABASE=homebuh
+      # Account for GUI clients (PhpStorm, DataGrip). The app itself connects as
+      # root over the internal network, but JDBC drivers handle empty-password
+      # accounts badly, so tooling gets a real password. The entrypoint creates
+      # this user and grants it ALL on MYSQL_DATABASE.
+      - MYSQL_USER=homebuh
+      - MYSQL_PASSWORD=homebuh
 
 volumes:
   homebuh-mysql:
